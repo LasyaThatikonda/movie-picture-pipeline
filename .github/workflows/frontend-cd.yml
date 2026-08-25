@@ -1,11 +1,11 @@
-name: Frontend Continuous Integration
+name: Frontend Continuous Deployment
 
 on:
-  pull_request:
+  push:
     branches: [ main ]
     paths:
       - 'frontend/**'
-      - '.github/workflows/frontend-ci.yaml'
+      - '.github/workflows/frontend-cd.yaml'
   workflow_dispatch:
 
 jobs:
@@ -67,23 +67,46 @@ jobs:
       - name: Run Tests
         run: npm run test
 
-  build:
-    name: Frontend Docker Build Verification
+  deploy:
+    name: Build, Push, and Deploy Frontend
     needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Docker Image
+      - name: Build and Push Docker Image to ECR
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          push: false
+          push: true
           build-args: |
-            REACT_APP_MOVIE_API_URL=http://localhost:5000
-          tags: frontend-test:${{ github.sha }}
+            REACT_APP_MOVIE_API_URL=${{ secrets.REACT_APP_MOVIE_API_URL }}
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.FRONTEND_ECR_REPO }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.FRONTEND_ECR_REPO }}:latest
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      - name: Deploy Frontend to Kubernetes
+        run: |
+          kubectl apply -f frontend/k8s/
+          kubectl set image deployment/frontend-deployment frontend=${{ steps.login-ecr.outputs.registry }}/${{ secrets.FRONTEND_ECR_REPO }}:${{ github.sha }}
+          kubectl rollout status deployment/frontend-deployment

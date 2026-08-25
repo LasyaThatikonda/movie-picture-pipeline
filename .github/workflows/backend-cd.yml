@@ -1,11 +1,11 @@
-name: Backend Continuous Integration
+name: Backend Continuous Deployment
 
 on:
-  pull_request:
+  push:
     branches: [ main ]
     paths:
       - 'backend/**'
-      - '.github/workflows/backend-ci.yaml'
+      - '.github/workflows/backend-cd.yaml'
   workflow_dispatch:
 
 jobs:
@@ -67,21 +67,47 @@ jobs:
       - name: Run Tests
         run: npm run test
 
-  build:
-    name: Backend Docker Build Verification
+  deploy:
+    name: Build, Push, and Deploy Backend
     needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Docker Image
+      - name: Build and Push Docker Image to ECR
         uses: docker/build-push-action@v4
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.BACKEND_ECR_REPO }}
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: false
-          tags: backend-test:${{ github.sha }}
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.BACKEND_ECR_REPO }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.BACKEND_ECR_REPO }}:latest
+
+      - name: Update Kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      - name: Deploy Backend to Kubernetes
+        run: |
+          kubectl apply -f backend/k8s/
+          kubectl set image deployment/backend-deployment backend=${{ steps.login-ecr.outputs.registry }}/${{ secrets.BACKEND_ECR_REPO }}:${{ github.sha }}
+          kubectl rollout status deployment/backend-deployment
