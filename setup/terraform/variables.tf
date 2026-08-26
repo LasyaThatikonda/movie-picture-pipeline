@@ -1,5 +1,7 @@
 variable "k8s_version" {
-  default = "1.25"
+  description = "Kubernetes version for the EKS cluster"
+  type        = string
+  default     = "1.31"
 }
 
 variable "enable_private" {
