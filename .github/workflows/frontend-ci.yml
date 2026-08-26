@@ -2,10 +2,11 @@ name: Frontend Continuous Integration
 
 on:
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
     paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yaml'
+      - 'starter/frontend/**'
+      - '.github/workflows/frontend-ci.yml'
   workflow_dispatch:
 
 jobs:
