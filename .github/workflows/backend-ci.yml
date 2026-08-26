@@ -19,24 +19,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          node-version: 18
+          python-version: '3.10'
 
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: ./starter/backend/node_modules
-          key: ${{ runner.os }}-backend-npm-${{ hashFiles('starter/backend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-backend-npm-
-
-      - name: Install Dependencies
-        run: npm install
+      - name: Install Pipenv and Dependencies
+        run: |
+          pip install pipenv
+          pipenv install --dev
 
       - name: Run Linting
-        run: npm run lint --if-present
+        run: pipenv run lint
 
   test:
     name: Backend Test
@@ -48,26 +42,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          node-version: 18
+          python-version: '3.10'
 
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: ./starter/backend/node_modules
-          key: ${{ runner.os }}-backend-npm-${{ hashFiles('starter/backend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-backend-npm-
-
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install Pipenv and Dependencies
+        run: |
+          pip install pipenv
+          pipenv install --dev
 
       - name: Run Tests
-        env:
-          CI: true
-        run: npm test --if-present
+        run: pipenv run test
 
   build:
     name: Backend Docker Build Verification
@@ -86,4 +72,4 @@ jobs:
           context: ./starter/backend
           file: ./starter/backend/Dockerfile
           push: false
-          tags: backend-test:${{ github.sha }}
+          tags: mp-backend:${{ github.sha }}

@@ -4,8 +4,8 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'backend/**'
-      - '.github/workflows/backend-cd.yaml'
+      - 'starter/backend/**'
+      - '.github/workflows/backend-cd.yml'
   workflow_dispatch:
 
 jobs:
@@ -14,58 +14,46 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./backend
+        working-directory: ./starter/backend
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          node-version: 18
+          python-version: '3.10'
 
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: ./backend/node_modules
-          key: ${{ runner.os }}-backend-npm-${{ hashFiles('backend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-backend-npm-
-
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install Pipenv and Dependencies
+        run: |
+          pip install pipenv
+          pipenv install --dev
 
       - name: Run Linting
-        run: npm run lint
+        run: pipenv run lint
 
   test:
     name: Backend Test
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./backend
+        working-directory: ./starter/backend
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          node-version: 18
+          python-version: '3.10'
 
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: ./backend/node_modules
-          key: ${{ runner.os }}-backend-npm-${{ hashFiles('backend/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-backend-npm-
-
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install Pipenv and Dependencies
+        run: |
+          pip install pipenv
+          pipenv install --dev
 
       - name: Run Tests
-        run: npm run test
+        run: pipenv run test
 
   deploy:
     name: Build, Push, and Deploy Backend
@@ -91,23 +79,23 @@ jobs:
 
       - name: Build and Push Docker Image to ECR
         uses: docker/build-push-action@v4
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.BACKEND_ECR_REPO }}
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: ./starter/backend
+          file: ./starter/backend/Dockerfile
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ secrets.BACKEND_ECR_REPO }}:${{ github.sha }}
             ${{ steps.login-ecr.outputs.registry }}/${{ secrets.BACKEND_ECR_REPO }}:latest
 
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
+
       - name: Update Kubeconfig
         run: |
           aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-      - name: Deploy Backend to Kubernetes
+      - name: Deploy to Kubernetes Cluster via Kustomize
         run: |
-          kubectl apply -f backend/k8s/
-          kubectl set image deployment/backend-deployment backend=${{ steps.login-ecr.outputs.registry }}/${{ secrets.BACKEND_ECR_REPO }}:${{ github.sha }}
-          kubectl rollout status deployment/backend-deployment
+          cd starter/backend/k8s
+          kustomize edit set image backend=${{ steps.login-ecr.outputs.registry }}/${{ secrets.BACKEND_ECR_REPO }}:${{ github.sha }}
+          kustomize build | kubectl apply -f -
