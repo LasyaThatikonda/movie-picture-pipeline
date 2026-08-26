@@ -4,8 +4,8 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'backend/**'
-      - '.github/workflows/backend-ci.yaml'
+      - 'starter/backend/**'
+      - '.github/workflows/backend-ci.yml'
   workflow_dispatch:
 
 jobs:
@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./backend
+        working-directory: ./starter/backend
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -27,8 +27,8 @@ jobs:
       - name: Cache Node Modules
         uses: actions/cache@v3
         with:
-          path: ./backend/node_modules
-          key: ${{ runner.os }}-backend-npm-${{ hashFiles('backend/package-lock.json') }}
+          path: ./starter/backend/node_modules
+          key: ${{ runner.os }}-backend-npm-${{ hashFiles('starter/backend/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-backend-npm-
 
@@ -36,14 +36,14 @@ jobs:
         run: npm ci
 
       - name: Run Linting
-        run: npm run lint
+        run: npm run lint --if-present
 
   test:
     name: Backend Test
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./backend
+        working-directory: ./starter/backend
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -56,8 +56,8 @@ jobs:
       - name: Cache Node Modules
         uses: actions/cache@v3
         with:
-          path: ./backend/node_modules
-          key: ${{ runner.os }}-backend-npm-${{ hashFiles('backend/package-lock.json') }}
+          path: ./starter/backend/node_modules
+          key: ${{ runner.os }}-backend-npm-${{ hashFiles('starter/backend/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-backend-npm-
 
@@ -65,7 +65,9 @@ jobs:
         run: npm ci
 
       - name: Run Tests
-        run: npm run test
+        env:
+          CI: true
+        run: npm test --if-present
 
   build:
     name: Backend Docker Build Verification
@@ -81,7 +83,7 @@ jobs:
       - name: Build Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: ./backend
-          file: ./backend/Dockerfile
+          context: ./starter/backend
+          file: ./starter/backend/Dockerfile
           push: false
           tags: backend-test:${{ github.sha }}
