@@ -19,4 +19,5 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+# Run the app entry script
+CMD ["pipenv", "run", "start"]
