@@ -33,7 +33,7 @@ jobs:
             ${{ runner.os }}-backend-npm-
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run Linting
         run: npm run lint --if-present
