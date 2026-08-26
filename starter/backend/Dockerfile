@@ -19,5 +19,5 @@ COPY . .
 
 EXPOSE 5000
 
-# Run the app entry script
-CMD ["pipenv", "run", "start"]
+# Bind Flask to 0.0.0.0 on port 5000
+CMD ["flask", "--app", ".", "run", "--host", "0.0.0.0", "--port", "5000"]
