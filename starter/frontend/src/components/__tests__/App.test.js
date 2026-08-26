@@ -8,5 +8,5 @@ const movieHeading = process.env.FAIL_TEST ? 'WRONG_HEADING' : 'Movie List';
 test('renders Movie List heading', () => {
   render(<App />);
   const linkElement = screen.getByText(movieHeading);
-  expect(linkElement).toBeInTheDocument();
+  expect(linkElement).not.toBeInTheDocument();
 });
